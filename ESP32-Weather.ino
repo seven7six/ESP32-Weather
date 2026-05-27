@@ -9,7 +9,7 @@
 #include <DallasTemperature.h>
 
 // --- Configuration ---
-const char* ssid = "<ssid>";
+const char* ssid = "The lan before time";
 const char* password = "<pass>";
 const float STATION_ALTITUDE = 215.0; 
 const int ONE_WIRE_BUS = 4; // DS18B20 Data Pin
@@ -251,8 +251,8 @@ void handleRoot() {
   
   // 4. Air Quality Card (Merged)
   html += "<div class='card' style='border-color:#2ecc71'><h2>Air Quality</h2>";
-  html += "<span class='val'>PM 2.5: " + String(mc2p5, 1) + "</span><span class='lbl' style='background:#2ecc71'>" + getPollutionLevel(mc2p5) + "</span>";
-  html += "<div style='margin-top:12px;'><span class='val'>PM 10: " + String(mc10p0, 1) + "</span><span class='lbl' style='background:#9b59b6'>" + getPollenLevel(mc10p0) + "</span></div>";
+  html += "<span class='val'>Pollution (PM2.5): " + String(mc2p5, 1) + "</span><span class='lbl' style='background:#2ecc71'>" + getPollutionLevel(mc2p5) + "</span>";
+  html += "<div style='margin-top:12px;'><span class='val'>Pollen/Dust (PM10): " + String(mc10p0, 1) + "</span><span class='lbl' style='background:#9b59b6'>" + getPollenLevel(mc10p0) + "</span></div>";
   html += "<div class='sub'>Source: <b>" + getPollutionSource() + "</b><br>Lung Risk: <b>" + String(mc1p0 > 15 ? "High" : "Low") + "</b></div></div>";
   
   // 5. Analytics
