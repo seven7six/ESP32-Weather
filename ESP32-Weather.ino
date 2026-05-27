@@ -22,10 +22,10 @@ float uv_val = 0, lux_val = 0;
 float mc1p0, mc2p5, mc4p0, mc10p0; 
 float nc0p5, nc1p0, nc2p5, nc4p0, nc10p0, typicalSize;
 
-// Trend Tracking (3-Hour Window)
+// Trend Tracking (3-Hour Window, 15-min intervals = 12 samples)
 float pHist[12], tHist[12], uHist[12], pmHist[12], polHist[12];
 int trendIdx = 0;
-bool historyReady = false;
+int samplesCollected = 0; // Changed from bool to counter
 float pRate = 0, tRate = 0, uRate = 0, pmRate = 0, polRate = 0;
 
 unsigned long lastReadTime = 0;
@@ -35,30 +35,43 @@ unsigned long lastHistoryTick = 0;
 // --- HELPERS ---
 
 void calculateTrends() {
-  if (!historyReady) return;
-  pRate = (pres - pHist[trendIdx]) / 3.0;
-  tRate = (temp - tHist[trendIdx]) / 3.0;
-  uRate = (uv_val - uHist[trendIdx]) / 3.0;
-  pmRate = (mc2p5 - pmHist[trendIdx]) / 3.0;
-  polRate = (mc10p0 - polHist[trendIdx]) / 3.0;
+  if (samplesCollected < 2) return;
+  
+  // Identify the oldest sample available
+  int oldestIdx = (samplesCollected < 12) ? 0 : trendIdx;
+  // Calculate how many hours have passed between the oldest sample and now
+  // Each sample represents 15 mins (0.25 hours)
+  float hoursElapsed = (samplesCollected < 12) ? (trendIdx * 0.25) : 3.0;
+
+  if (hoursElapsed <= 0) return;
+
+  pRate = (pres - pHist[oldestIdx]) / hoursElapsed;
+  tRate = (temp - tHist[oldestIdx]) / hoursElapsed;
+  uRate = (uv_val - uHist[oldestIdx]) / hoursElapsed;
+  pmRate = (mc2p5 - pmHist[oldestIdx]) / hoursElapsed;
+  polRate = (mc10p0 - polHist[oldestIdx]) / hoursElapsed;
 }
 
 String getTrendArrow(float rate, float threshold) {
-  if (!historyReady) return "---";
-  if (rate > threshold) return "&uarr; Rising";
-  if (rate < -threshold) return "&darr; Falling";
-  return "Steady";
+  if (samplesCollected < 2) return "Initializing...";
+  String trendStr = "";
+  if (abs(rate) > threshold) {
+    trendStr = (rate > 0) ? "&uarr; Rising " : "&darr; Falling ";
+    trendStr += "(" + String(abs(rate), 1) + "/h)";
+  } else {
+    trendStr = "Steady";
+  }
+  return trendStr;
 }
 
 String getTrendColor(float rate, float threshold, bool flip = false) {
-  if (!historyReady) return "#7f8c8d";
-  bool rising = rate > threshold;
-  bool falling = rate < -threshold;
-  if (rising) return flip ? "#e74c3c" : "#2ecc71";
-  if (falling) return flip ? "#2ecc71" : "#e74c3c";
+  if (samplesCollected < 2) return "#7f8c8d";
+  if (rate > threshold) return flip ? "#e74c3c" : "#2ecc71";
+  if (rate < -threshold) return flip ? "#2ecc71" : "#e74c3c";
   return "#3498db"; 
 }
 
+// ... (Rest of your helper functions: getOutdoorFreshness, etc. remain unchanged)
 String getOutdoorFreshness(float k) { return (k > 100) ? "Fresh" : (k > 50 ? "Lingering Fumes" : "Stagnant/Smog"); }
 String getFreshnessColor(float k) { return (k > 100) ? "#2ecc71" : (k > 50 ? "#f39c12" : "#e74c3c"); }
 String getVitDStatus(float uvi) { return (uvi < 3.0) ? "Slow Synthesis" : "Optimal for Vit D"; }
@@ -101,8 +114,9 @@ void loop() {
   if (now - lastHistoryTick >= 900000 || lastHistoryTick == 0) {
     pHist[trendIdx] = pres; tHist[trendIdx] = temp; uHist[trendIdx] = uv_val;
     pmHist[trendIdx] = mc2p5; polHist[trendIdx] = mc10p0;
+    
     trendIdx = (trendIdx + 1) % 12;
-    if (trendIdx == 0) historyReady = true;
+    if (samplesCollected < 12) samplesCollected++;
     lastHistoryTick = now;
   }
 }
@@ -138,6 +152,7 @@ void handleRoot() {
   html += "<div class='card' style='border-color:#9b59b6'><h2>Pollen & Dust</h2><span class='val'>PM 10: " + String(mc10p0, 1) + "</span><span class='lbl' style='background:#9b59b6'>" + getPollenLevel(mc10p0) + "</span><div class='sub'>Typical Size: <b>" + String(typicalSize, 2) + " &micro;m</b><br>Count (NC10): " + String(nc10p0, 1) + "</div></div>";
   html += "<div class='card' style='border-color:#3498db'><h2>Barometer</h2><span class='val'>" + String(pres, 1) + " hPa</span><div class='sub'>Sea Level (MSL)<br>Alt: " + String(STATION_ALTITUDE,0) + "m</div></div>";
   
+  // Card 6: Trends (Modified for instant start and rate display)
   html += "<div class='card' style='border-color:#34495e'><h2>3-Hour Trends</h2>";
   html += "<div class='trnd' style='color:" + getTrendColor(pRate, 0.3) + "'>Pressure: " + (pRate < -1.0 ? "STORM WARN" : getTrendArrow(pRate, 0.3)) + "</div>";
   html += "<div class='trnd' style='color:" + getTrendColor(tRate, 0.2) + "'>Temp: " + getTrendArrow(tRate, 0.2) + "</div>";
