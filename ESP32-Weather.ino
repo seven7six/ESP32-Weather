@@ -130,7 +130,7 @@ String getPollutionSource() {
 }
 
 String getPollutionLevel(float pm25) {
-  if (mc1p0 > 15) return "Unhealthy (Fine)";
+  if (mc1p0 > 15) return "Unhealthy (fine particle)";
   if (pm25 <= 12) return "Excellent";
   if (pm25 <= 35) return "Moderate";
   return "Unhealthy";
